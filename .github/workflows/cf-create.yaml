@@ -48,9 +48,6 @@ jobs:
         working-directory: .
     outputs:
       cfn-stack-prefix: ${{ steps.get-stack-params.outputs.cfn-stack-prefix }}
-      # cfn-stack-params: ${{ steps.get-stack-params.outputs.stack-params }}
-      cfn-stack-template: ${{ steps.get-stack-params.outputs.cfn-stack-template }}
-      # cfn-stack-details:  ${{ steps.get-stack-params.outputs.stack-details }}
       outcome:  ${{ steps.set-cfn-output.outputs.cfn-stack-output }}
 
     steps:
@@ -61,15 +58,16 @@ jobs:
         id: get-stack-params
         run: |
           echo "cfn-stack-prefix=`jq -r '."stack-prefix"' ${{ github.workspace }}/cft/cfn-parameters.json`" >> $GITHUB_OUTPUT
-          echo "cfn-stack-template=`jq -r '."stack-template"' ${{ github.workspace }}/cft/cfn-parameters.json`" >> $GITHUB_OUTPUT
           cat cft/cfn-parameters.json|jq -r '.parameters.${{ inputs.cfn-stack-type }}.${{ inputs.github_env }}[0]'| jq -r 'to_entries'|jq 'map(.ParameterKey = .key| .ParameterValue = .value | del(.key, .value))' > ${{ github.workspace }}/parameters.json
           cat ${{ github.workspace }}/parameters.json|jq
       - name: Print stack params
         id: print-stack-params
         run: |
-          echo ${{ steps.get-stack-params.outputs.cfn-stack-prefix }}
-          # echo ${{ steps.get-stack-params.outputs.cfn-stack-params }}
-          echo ${{ steps.get-stack-params.outputs.cfn-stack-template }}
+          echo "GitHub Env : ${{ inputs.github_env }}"
+          echo "Stack Template : ${{ inputs.cfn-template }}"
+          echo "Stack Stack Suffix : ${{ inputs.cfn-stack-suffix }}"
+          echo "Stack Type : ${{ inputs.cfn-stack-type }}"
+          echo "Stack Prefix: ${{ steps.get-stack-params.outputs.cfn-stack-prefix }}"
 
       - name: Configure AWS credentials from AWS account
         uses: aws-actions/configure-aws-credentials@v2
