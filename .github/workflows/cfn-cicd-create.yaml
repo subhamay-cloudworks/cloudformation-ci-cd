@@ -1,0 +1,28 @@
+name: "Build, Plan and Deploy Stack"
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write # This is required for aws oidc connection
+  contents: read # This is required for actions/checkout
+  pull-requests: write # This is required for gh bot to comment PR
+
+jobs:
+  ## Plan and Deploy Development
+  devl:
+    uses: subhamay-cloudworks/cloudformation-ci-cd/.github/workflows/cf-create.yaml@main
+    with:
+      github_env: devl
+      cfn-template: /cft/create-s3-bucket.yaml 
+      cfn-stack-suffix: cicd-stack
+    secrets:
+      aws_region: ${{ secrets.AWS_DEVL_REGION }}
+      aws_role_arn: ${{ secrets.AWS_DEVL_ROLE_ARN }}
+      kms_key_arn: ${{ secrets.AWS_DEVL_KMS_KEY_ARN }}
+      code_repository_s3_bucket: ${{ secrets.CODE_DEVL_REPOSITORY_S3_BUCKET }}
+  print-devl-output:
+    needs: devl
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print deploy output
+        run: echo "${{ needs.devl.outputs.result }}"

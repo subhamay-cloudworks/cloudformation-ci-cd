@@ -1,0 +1,111 @@
+name: CloudFormation Create Stack
+
+on:
+  workflow_call:
+    inputs:
+      github_env:
+        description: 'Specifies the GitHub deployment environment.'
+        required: false
+        type: string
+        default: "devl"
+      cfn-template:
+        description: 'Specifies the CloudFormation template that will be executed.'
+        required: true
+        type: string
+      cfn-stack-suffix:
+        description: 'Specifies the CloudFormation template suffix that will be executed.'
+        required: true
+        type: string
+      cfn-stack-type:
+          description: 'Specifies the CloudFormation Stack type (cross / root).'
+          required: true
+          type: string
+    outputs:
+      cfn-output:
+        description: The result of cloudformation create operation
+        value: ${{ jobs.cfn-create-stack.outputs.outcome }}
+    secrets:
+      aws_region:
+        required: true
+      aws_role_arn:
+        required: true
+      code_repository_s3_bucket:
+        required: true
+      kms_key_arn: 
+        required: true
+permissions:
+  id-token: write # This is required for aws oidc connection
+  contents: read # This is required for actions/checkout
+  pull-requests: write # This is required for gh bot to comment PR
+ 
+jobs:
+  cfn-create-stack:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.github_env }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: .
+    outputs:
+      cfn-stack-prefix: ${{ steps.get-stack-params.outputs.stack-prefix }}
+      cfn-stack-params: ${{ steps.get-stack-params.outputs.stack-params }}
+      cfn-stack-template: ${{ steps.get-stack-params.outputs.stack-template }}
+      cfn-stack-details:  ${{ steps.get-stack-params.outputs.stack-details }}
+      outcome:  ${{ steps.set-cfn-output.outputs.cfn-stack-output }}
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+
+      - name: Get the stack parameters
+        id: get-stack-params
+        run: |
+          echo "cfn-stack-prefix=`jq -r '."stack-prefix"' ${{ github.workspace }}/cft/cfn-parameters.json`" >> $GITHUB_OUTPUT
+          echo "cfn-stack-template=`jq -r '."stack-template"' ${{ github.workspace }}/cft/cfn-parameters.json`" >> $GITHUB_OUTPUT
+          cat cft/cfn-parameters.json|jq -r '.parameters.${{ inputs.cfn-stack-type }}.${{ inputs.github_env }}[0]'| jq -r 'to_entries'|jq 'map(.ParameterKey = .key| .ParameterValue = .value | del(.key, .value))' > ${{ github.workspace }}/parameters.json
+          cat ${{ github.workspace }}/parameters.json|jq
+      - name: Print stack params
+        id: print-stack-params
+        run: |
+          echo ${{ steps.get-stack-params.outputs.cfn-stack-prefix }}
+          echo ${{ steps.get-stack-params.outputs.cfn-stack-params }}
+          echo ${{ steps.get-stack-params.outputs.cfn-stack-template }}
+
+      - name: Configure AWS credentials from AWS account
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.aws_role_arn }}
+          aws-region: ${{ secrets.aws_region }}
+          role-session-name: github-aws-cloudformation-oidc
+          
+      - name: Upload code to S3 Repository Bucket
+        id: s3-upload
+        env: 
+          CODE_REPOSITORY_S3_BUCKET: ${{ secrets.code_repository_s3_bucket }}
+          KMS_KEY_ARN:  ${{ secrets.kms_key_arn }}
+        run: |
+          aws s3 sync ${{ github.workspace }}/cft s3://${{ secrets.code_repository_s3_bucket }}/${{ github.event.repository.name }}/cft/ --sse "aws:kms" --sse-kms-key-id ${{ secrets.KMS_KEY_ARN }} --storage-class GLACIER_IR --exclude "*" --include "*.yaml"
+          cd ${{ github.workspace }}/code/
+          for file_name in `ls *`
+          do
+            zip_file="`echo ${file_name}|cut -d"." -f1`.zip"
+            zip ${zip_file}.zip ${file_name} 
+            aws s3 cp ${zip_file}.zip s3://${{ secrets.code_repository_s3_bucket }}/${{ github.event.repository.name }}/code/ --sse "aws:kms" --sse-kms-key-id ${{ secrets.KMS_KEY_ARN }} --storage-class GLACIER_IR --exclude "*" --include "*.zip"
+          done
+
+      - name: Deploy to AWS CloudFormation
+        id: deploy
+        continue-on-error: false
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: ${{ steps.get-stack-params.outputs.cfn-stack-prefix }}-${{ inputs.cfn-stack-suffix }} 
+          template: ${{ github.workspace }}/${{ inputs.cfn-template }}   
+          parameter-overrides: file:///${{ github.workspace }}/parameters.json ####${{ steps.get-stack-params.outputs.cfn-stack-params }}
+          capabilities: CAPABILITY_NAMED_IAM
+          no-fail-on-empty-changeset: 1
+          disable-rollback: 1
+
+      - name: Set CloudFormation Stack output
+        id: set-cfn-output
+        run: |
+          echo "cfn-stack-output=`aws cloudformation describe-stacks --stack-name ${{ steps.get-stack-params.outputs.cfn-stack-prefix }}-${{ inputs.cfn-stack-suffix }}  --region ${{ secrets.aws_region }}|jq -r '.Stacks[0].StackStatus'`" >> $GITHUB_OUTPUT
