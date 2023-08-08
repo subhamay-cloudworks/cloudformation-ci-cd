@@ -47,10 +47,10 @@ jobs:
         shell: bash
         working-directory: .
     outputs:
-      cfn-stack-prefix: ${{ steps.get-stack-params.outputs.stack-prefix }}
-      cfn-stack-params: ${{ steps.get-stack-params.outputs.stack-params }}
-      cfn-stack-template: ${{ steps.get-stack-params.outputs.stack-template }}
-      cfn-stack-details:  ${{ steps.get-stack-params.outputs.stack-details }}
+      cfn-stack-prefix: ${{ steps.get-stack-params.outputs.cfn-stack-prefix }}
+      # cfn-stack-params: ${{ steps.get-stack-params.outputs.stack-params }}
+      cfn-stack-template: ${{ steps.get-stack-params.outputs.cfn-stack-template }}
+      # cfn-stack-details:  ${{ steps.get-stack-params.outputs.stack-details }}
       outcome:  ${{ steps.set-cfn-output.outputs.cfn-stack-output }}
 
     steps:
@@ -68,7 +68,7 @@ jobs:
         id: print-stack-params
         run: |
           echo ${{ steps.get-stack-params.outputs.cfn-stack-prefix }}
-          echo ${{ steps.get-stack-params.outputs.cfn-stack-params }}
+          # echo ${{ steps.get-stack-params.outputs.cfn-stack-params }}
           echo ${{ steps.get-stack-params.outputs.cfn-stack-template }}
 
       - name: Configure AWS credentials from AWS account
