@@ -88,7 +88,7 @@ jobs:
           do
             zip_file="`echo ${file_name}|cut -d"." -f1`.zip"
             zip ${zip_file} ${file_name} 
-            aws s3 cp ${zip_file}.zip s3://${{ secrets.code_repository_s3_bucket }}/${{ github.event.repository.name }}/code/ --sse "aws:kms" --sse-kms-key-id ${{ secrets.KMS_KEY_ARN }} --storage-class GLACIER_IR --exclude "*" --include "*.zip"
+            aws s3 cp ${zip_file} s3://${{ secrets.code_repository_s3_bucket }}/${{ github.event.repository.name }}/code/ --sse "aws:kms" --sse-kms-key-id ${{ secrets.KMS_KEY_ARN }} --storage-class GLACIER_IR --exclude "*" --include "*.zip"
           done
 
       - name: Deploy to AWS CloudFormation
