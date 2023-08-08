@@ -106,4 +106,5 @@ jobs:
       - name: Set CloudFormation Stack output
         id: set-cfn-output
         run: |
-          echo "cfn-stack-output=`aws cloudformation describe-stacks --stack-name ${{ steps.get-stack-params.outputs.cfn-stack-prefix }}-${{ inputs.cfn-stack-suffix }}  --region ${{ secrets.aws_region }}|jq -r '.Stacks[0].StackStatus'`" >> $GITHUB_OUTPUT
+          #echo "cfn-stack-output=`aws cloudformation describe-stacks --stack-name ${{ steps.get-stack-params.outputs.cfn-stack-prefix }}-${{ inputs.cfn-stack-suffix }}  --region ${{ secrets.aws_region }}|jq -r '.Stacks[0].StackStatus'`" >> $GITHUB_OUTPUT
+          echo "cfn-stack-output=`aws cloudformation describe-stacks --stack-name ${{ steps.get-stack-params.outputs.cfn-stack-prefix }}-${{ inputs.cfn-stack-suffix }}  --region ${{ secrets.aws_region }}|jq -r '.Stacks[0].Outputs|= @base64'|jq '.Stacks[0].Outputs`" >> $GITHUB_OUTPUT
