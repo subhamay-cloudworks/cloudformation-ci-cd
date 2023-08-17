@@ -5,4 +5,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Output GitHub context
-        run: echo "${{ github.ref_name }}"
+        run: echo "${{ substring(github.ref_name,15 }}"
